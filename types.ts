@@ -19,3 +19,5 @@ export enum VoiceStatus {
   ACTIVE = 'ACTIVE',
   ERROR = 'ERROR'
 }
+
+export type UserRole = 'student' | 'teacher';
