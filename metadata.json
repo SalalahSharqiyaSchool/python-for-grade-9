@@ -1,0 +1,7 @@
+{
+  "name": "بيثون الصغير - Python for 9th Grade",
+  "description": "منصة تعليمية تفاعلية لتعليم البرمجة بلغة بايثون لطلاب الصف التاسع، مدعومة بمساعد صوتي ذكي (Live API).",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
