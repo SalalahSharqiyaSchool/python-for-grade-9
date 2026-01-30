@@ -45,7 +45,7 @@ const App: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === '1234') { // رمز الدخول الافتراضي
+    if (password === '20072015') { // رمز الدخول الافتراضي
       setRole('teacher');
       setShowLoginModal(false);
       setPassword('');
