@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Lesson } from '../types';
 
 interface SidebarProps {
@@ -8,17 +8,35 @@ interface SidebarProps {
   onSelect: (lesson: Lesson) => void;
   isOpen: boolean;
   onClose: () => void;
+  onUpdateLessons?: (newLessons: Lesson[]) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ lessons, currentLessonId, onSelect, isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ lessons, currentLessonId, onSelect, isOpen, onClose, onUpdateLessons }) => {
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importCode, setImportCode] = useState('');
+
+  const handleImport = () => {
+    try {
+      const decodedData = decodeURIComponent(escape(atob(importCode)));
+      const newLessons = JSON.parse(decodedData) as Lesson[];
+      if (Array.isArray(newLessons) && newLessons.length > 0) {
+        onUpdateLessons?.(newLessons);
+        setShowImportModal(false);
+        setImportCode('');
+        alert('تم تحديث المنهج بنجاح! ستظهر الدروس الجديدة الآن.');
+      } else {
+        throw new Error('Invalid format');
+      }
+    } catch (e) {
+      alert('الكود المدخل غير صحيح. يرجى التأكد من الكود الذي أرسله المعلم.');
+    }
+  };
+
   return (
     <>
-      {/* Overlay for mobile when sidebar is open */}
+      {/* Overlay for mobile */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
-          onClick={onClose}
-        ></div>
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={onClose}></div>
       )}
 
       <aside className={`
@@ -43,31 +61,74 @@ const Sidebar: React.FC<SidebarProps> = ({ lessons, currentLessonId, onSelect, i
                 onClick={() => onSelect(lesson)}
                 className={`w-full text-right px-4 py-3 rounded-xl transition-all flex items-center gap-3 ${
                   currentLessonId === lesson.id
-                    ? 'bg-blue-600 text-white shadow-lg'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
                     : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200'
                 }`}
               >
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900/50 flex items-center justify-center text-sm font-bold">
-                  {index + 1}
+                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900/50 flex items-center justify-center text-xs font-bold font-mono">
+                  {String(index + 1).padStart(2, '0')}
                 </span>
-                <span className="truncate">{lesson.title}</span>
+                <span className="truncate text-sm font-bold">{lesson.title}</span>
               </button>
             ))}
           </nav>
 
-          <div className="mt-6 pt-6 border-t border-gray-700">
+          <div className="mt-6 pt-6 border-t border-gray-700 space-y-4">
             <div className="bg-blue-900/30 rounded-xl p-4 border border-blue-800/50">
-              <h3 className="text-xs font-bold text-blue-300 mb-2 uppercase tracking-wider">تقدمك</h3>
-              <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+              <h3 className="text-[10px] font-bold text-blue-300 mb-2 uppercase tracking-widest">تقدمك في المنهج</h3>
+              <div className="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
                 <div 
-                  className="bg-blue-500 h-full transition-all duration-500" 
+                  className="bg-blue-500 h-full transition-all duration-700" 
                   style={{ width: `${((lessons.findIndex(l => l.id === currentLessonId) + 1) / lessons.length) * 100}%` }}
                 ></div>
               </div>
             </div>
+
+            <button 
+              onClick={() => setShowImportModal(true)}
+              className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-blue-400 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 border border-gray-600"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              تحديث المنهج من المعلم
+            </button>
           </div>
         </div>
       </aside>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowImportModal(false)}></div>
+          <div className="relative bg-gray-900 p-8 rounded-3xl border border-blue-500/30 max-w-lg w-full shadow-2xl animate-in fade-in zoom-in duration-300">
+            <h3 className="text-2xl font-bold text-white mb-4">تحديث الدروس</h3>
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+              قم بلصق الكود الذي أرسله لك المعلم هنا لتحديث دروسك وأنشطتك فوراً.
+            </p>
+            <textarea 
+              value={importCode}
+              onChange={(e) => setImportCode(e.target.value)}
+              className="w-full h-32 bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-blue-400 font-mono text-xs focus:ring-2 focus:ring-blue-500 outline-none transition-all mb-6"
+              placeholder="الصق الكود هنا..."
+            />
+            <div className="flex gap-4">
+              <button 
+                onClick={handleImport}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg"
+              >
+                تحديث الآن
+              </button>
+              <button 
+                onClick={() => setShowImportModal(false)}
+                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold transition-all"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
