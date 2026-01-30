@@ -29,8 +29,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [importCode, setImportCode] = useState('');
 
   const handleImport = () => {
+    if (!importCode.trim()) return;
     try {
-      const decodedData = decodeURIComponent(escape(atob(importCode)));
+      const decodedData = decodeURIComponent(escape(atob(importCode.trim())));
       const newLessons = JSON.parse(decodedData) as Lesson[];
       if (Array.isArray(newLessons) && newLessons.length > 0) {
         onUpdateLessons?.(newLessons);
@@ -119,17 +120,34 @@ const Sidebar: React.FC<SidebarProps> = ({
       {showImportModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowImportModal(false)}></div>
-          <div className="relative bg-gray-900 p-8 rounded-3xl border border-blue-500/30 max-w-lg w-full shadow-2xl">
-            <h3 className="text-2xl font-bold text-white mb-4">تحديث الدروس</h3>
-            <textarea 
+          <div className="relative bg-gray-900 p-8 rounded-3xl border border-blue-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in duration-200">
+            <h3 className="text-2xl font-bold text-white mb-4 text-center">تزامن المنهج 🔄</h3>
+            <p className="text-gray-400 text-sm mb-6 text-center">
+              الصق الكود الموحد الذي استلمته من المعلم في السطر أدناه.
+            </p>
+            
+            <input 
+              type="text"
               value={importCode}
               onChange={(e) => setImportCode(e.target.value)}
-              className="w-full h-32 bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-blue-400 font-mono text-xs mb-6"
+              className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-4 text-blue-400 font-mono text-xs focus:ring-2 focus:ring-blue-500 outline-none mb-6"
               placeholder="الصق الكود هنا..."
             />
+            
             <div className="flex gap-4">
-              <button onClick={handleImport} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold">تحديث الآن</button>
-              <button onClick={() => setShowImportModal(false)} className="px-6 py-3 bg-gray-700 text-white rounded-xl font-bold">إلغاء</button>
+              <button 
+                onClick={handleImport} 
+                disabled={!importCode.trim()}
+                className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold disabled:opacity-50 transition-all"
+              >
+                تحديث الدروس الآن
+              </button>
+              <button 
+                onClick={() => setShowImportModal(false)} 
+                className="px-6 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold transition-all"
+              >
+                إلغاء
+              </button>
             </div>
           </div>
         </div>
