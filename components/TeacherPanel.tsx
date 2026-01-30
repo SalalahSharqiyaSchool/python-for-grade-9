@@ -57,14 +57,16 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ lessons, onSave, onClose })
   };
 
   const handleExport = () => {
-    const code = btoa(unescape(encodeURIComponent(JSON.stringify(localLessons))));
+    // تصغير البيانات عن طريق تحويلها لـ JSON مضغوط (بدون مسافات)
+    const compressedData = JSON.stringify(localLessons);
+    const code = btoa(unescape(encodeURIComponent(compressedData)));
     setExportCode(code);
     setShowExportModal(true);
   };
 
   const copyExportCode = () => {
     navigator.clipboard.writeText(exportCode);
-    alert('تم نسخ كود المنهج! أرسله لطلابك الآن.');
+    alert('تم نسخ كود المنهج بنجاح!');
   };
 
   return (
@@ -72,7 +74,6 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ lessons, onSave, onClose })
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose}></div>
       
       <div className="relative w-full max-w-4xl h-[85vh] bg-gray-900 rounded-3xl shadow-2xl border border-amber-500/30 overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
-        {/* Header */}
         <div className="p-6 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400">
@@ -101,15 +102,13 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ lessons, onSave, onClose })
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-          {/* Lessons List */}
           <div className="w-full md:w-1/3 bg-gray-800/50 border-l border-gray-700 p-4 overflow-y-auto">
             <button 
               onClick={handleAdd}
-              className="w-full mb-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2"
+              className="w-full mb-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-lg transition-all"
             >
               إضافة درس جديد
             </button>
-            
             <div className="space-y-2">
               {localLessons.map((lesson, idx) => (
                 <div 
@@ -133,7 +132,6 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ lessons, onSave, onClose })
             </div>
           </div>
 
-          {/* Edit Form */}
           <div className="flex-1 p-6 overflow-y-auto">
             {editingLesson ? (
               <div className="space-y-6">
@@ -141,14 +139,14 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ lessons, onSave, onClose })
                   type="text" 
                   value={editingLesson.title}
                   onChange={(e) => setEditingLesson({...editingLesson, title: e.target.value})}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none"
                   placeholder="عنوان الدرس..."
                 />
                 <textarea 
                   rows={4}
                   value={editingLesson.content}
                   onChange={(e) => setEditingLesson({...editingLesson, content: e.target.value})}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none"
                   placeholder="شرح الدرس..."
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -161,36 +159,48 @@ const TeacherPanel: React.FC<TeacherPanelProps> = ({ lessons, onSave, onClose })
                 </div>
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-600">اختر درساً للبدء</div>
+              <div className="h-full flex items-center justify-center text-gray-600">اختر درساً للبدء أو أضف درساً جديداً</div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Export Modal Overlay */}
+      {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setShowExportModal(false)}></div>
           <div className="relative bg-gray-800 p-8 rounded-3xl border border-blue-500/30 max-w-lg w-full shadow-2xl animate-in fade-in zoom-in duration-300">
             <h3 className="text-2xl font-bold text-white mb-4">كود مشاركة المنهج</h3>
             <p className="text-gray-400 text-sm mb-6 leading-relaxed">
-              قم بنسخ هذا الكود وإرساله لطلابك. سيقوم الطلاب بلصق هذا الكود في تطبيقهم لتظهر لهم الدروس الجديدة التي أضفتها فوراً.
+              هذا هو الكود الموحد لمنهجك. أرسله لطلابك ليقوموا بتحديث دروسهم في سطر واحد.
             </p>
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-700 mb-6 relative">
-              <p className="text-blue-400 font-mono text-[10px] break-all max-h-40 overflow-y-auto">
-                {exportCode}
-              </p>
+            
+            {/* عرض الكود في سطر واحد داخل Input */}
+            <div className="relative mb-6">
+              <input 
+                readOnly
+                value={exportCode}
+                className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-4 text-blue-400 font-mono text-xs overflow-x-auto focus:ring-2 focus:ring-blue-500 outline-none"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 bg-gray-900 px-2 py-1 rounded text-[10px] text-gray-500 border border-gray-700 pointer-events-none">
+                سطر واحد
+              </div>
             </div>
+
             <div className="flex gap-4">
               <button 
                 onClick={copyExportCode}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/20"
+                className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
               >
-                نسخ الكود
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                نسخ الكود الموحد
               </button>
               <button 
                 onClick={() => setShowExportModal(false)}
-                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold transition-all"
+                className="px-6 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold transition-all"
               >
                 إغلاق
               </button>
