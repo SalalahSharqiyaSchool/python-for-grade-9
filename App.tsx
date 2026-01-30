@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LESSONS as INITIAL_LESSONS } from './constants';
-import { Lesson } from './types';
+import { Lesson, UserRole } from './types';
 import CodeEditor from './components/CodeEditor';
 import Sidebar from './components/Sidebar';
 import VoiceTutor from './components/VoiceTutor';
@@ -9,7 +9,6 @@ import LessonContent from './components/LessonContent';
 import TeacherPanel from './components/TeacherPanel';
 
 const App: React.FC = () => {
-  // Load lessons from localStorage or use initial constants
   const [lessons, setLessons] = useState<Lesson[]>(() => {
     const saved = localStorage.getItem('python_lessons');
     return saved ? JSON.parse(saved) : INITIAL_LESSONS;
@@ -19,8 +18,12 @@ const App: React.FC = () => {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTeacherPanelOpen, setIsTeacherPanelOpen] = useState(false);
+  
+  // Role Management
+  const [role, setRole] = useState<UserRole>('student');
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [password, setPassword] = useState('');
 
-  // Sync lessons to localStorage
   useEffect(() => {
     localStorage.setItem('python_lessons', JSON.stringify(lessons));
   }, [lessons]);
@@ -32,13 +35,29 @@ const App: React.FC = () => {
 
   const handleSaveLessons = (updatedLessons: Lesson[]) => {
     setLessons(updatedLessons);
-    // If the current lesson was deleted or updated, refresh it
     const stillExists = updatedLessons.find(l => l.id === currentLesson.id);
     if (!stillExists && updatedLessons.length > 0) {
       setCurrentLesson(updatedLessons[0]);
     } else if (stillExists) {
       setCurrentLesson(stillExists);
     }
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === '1234') { // رمز الدخول الافتراضي
+      setRole('teacher');
+      setShowLoginModal(false);
+      setPassword('');
+      alert('مرحباً بك أيها المعلم! تم تفعيل أدوات التحكم.');
+    } else {
+      alert('رمز الدخول خاطئ!');
+    }
+  };
+
+  const handleLogout = () => {
+    setRole('student');
+    setIsTeacherPanelOpen(false);
   };
 
   return (
@@ -51,6 +70,9 @@ const App: React.FC = () => {
         onUpdateLessons={handleSaveLessons}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        role={role}
+        onTeacherLogin={() => setShowLoginModal(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
@@ -73,17 +95,19 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Teacher Toggle */}
-            <button 
-              onClick={() => setIsTeacherPanelOpen(true)}
-              className="p-2.5 rounded-xl bg-gray-800 text-amber-400 hover:bg-gray-700 transition-all border border-amber-400/20"
-              title="لوحة المعلم"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
+            {/* Teacher Toggle - Only visible to teachers */}
+            {role === 'teacher' && (
+              <button 
+                onClick={() => setIsTeacherPanelOpen(true)}
+                className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all border border-amber-500/20"
+                title="لوحة المعلم"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            )}
 
             <button 
               onClick={() => setIsVoiceActive(true)}
@@ -100,23 +124,40 @@ const App: React.FC = () => {
 
         {/* Content Body */}
         <div className="flex-1 flex flex-col lg:grid lg:grid-cols-2 gap-4 p-4 overflow-hidden overflow-y-auto lg:overflow-hidden">
-          {/* Section 1: Lesson Content */}
           <div className="bg-gray-800 rounded-2xl p-5 md:p-8 shadow-xl border border-gray-700 flex flex-col min-h-[45vh] lg:min-h-0 lg:h-full overflow-y-auto">
             <LessonContent lesson={currentLesson} />
-            <div className="mt-auto pt-6">
-              <div className="p-4 bg-gray-900/50 rounded-xl border border-dashed border-gray-700">
-                <p className="text-sm text-gray-400 text-center italic">
-                  نصيحة: طبّق الكود الذي قرأته في الأسفل لرؤية النتيجة مباشرة!
-                </p>
-              </div>
-            </div>
           </div>
-          {/* Section 2: Code Editor */}
           <div className="min-h-[45vh] lg:min-h-0 lg:h-full flex flex-col">
             <CodeEditor initialCode={currentLesson.codeSnippet} expectedOutput={currentLesson.expectedOutput} />
           </div>
         </div>
       </main>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setShowLoginModal(false)}></div>
+          <div className="relative bg-gray-800 p-8 rounded-3xl border border-amber-500/30 max-w-sm w-full shadow-2xl animate-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-white mb-4 text-center">دخول المعلم 🔐</h3>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="أدخل رمز الدخول..."
+                className="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-amber-500 outline-none text-center text-lg tracking-[1em]"
+                autoFocus
+              />
+              <button type="submit" className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-amber-500/20">
+                تحقق من الهوية
+              </button>
+              <button type="button" onClick={() => setShowLoginModal(false)} className="w-full py-2 text-gray-500 hover:text-gray-400 text-sm">
+                إلغاء
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Teacher Panel Modal */}
       {isTeacherPanelOpen && (
