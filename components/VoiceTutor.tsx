@@ -7,8 +7,15 @@ interface VoiceTutorProps {
   context: string;
 }
 
+interface SharedSnippet {
+  id: string;
+  code: string;
+  timestamp: Date;
+}
+
 const VoiceTutor: React.FC<VoiceTutorProps> = ({ active, context }) => {
   const [transcription, setTranscription] = useState<string>('');
+  const [snippets, setSnippets] = useState<SharedSnippet[]>([]);
   const [isReady, setIsReady] = useState(false);
   
   const audioContextInRef = useRef<AudioContext | null>(null);
@@ -16,6 +23,7 @@ const VoiceTutor: React.FC<VoiceTutorProps> = ({ active, context }) => {
   const nextStartTimeRef = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const sessionRef = useRef<any>(null);
+  const accumulatedTranscriptionRef = useRef<string>('');
 
   // Manual implementation of encode/decode for base64
   const encode = (bytes: Uint8Array) => {
@@ -68,10 +76,28 @@ const VoiceTutor: React.FC<VoiceTutorProps> = ({ active, context }) => {
     };
   };
 
+  const extractCodeBlocks = (text: string) => {
+    const regex = /```(?:python)?\n?([\s\S]*?)```/g;
+    let match;
+    const found: string[] = [];
+    while ((match = regex.exec(text)) !== null) {
+      if (match[1]) found.push(match[1].trim());
+    }
+    return found;
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('تم نسخ الكود!');
+  };
+
+  const deleteSnippet = (id: string) => {
+    setSnippets(prev => prev.filter(s => s.id !== id));
+  };
+
   useEffect(() => {
     if (!active) {
       if (sessionRef.current) {
-        // Assume session cleanup
         sessionRef.current = null;
       }
       return;
@@ -106,15 +132,34 @@ const VoiceTutor: React.FC<VoiceTutorProps> = ({ active, context }) => {
               scriptProcessor.connect(audioContextInRef.current!.destination);
             },
             onmessage: async (message: LiveServerMessage) => {
-              // Transcription handling
               if (message.serverContent?.outputTranscription) {
-                setTranscription(prev => prev + message.serverContent?.outputTranscription?.text);
+                const text = message.serverContent.outputTranscription.text;
+                accumulatedTranscriptionRef.current += text;
+                setTranscription(accumulatedTranscriptionRef.current);
+                
+                // Try to extract code blocks as they appear
+                const blocks = extractCodeBlocks(accumulatedTranscriptionRef.current);
+                if (blocks.length > 0) {
+                  setSnippets(prev => {
+                    const existingCodes = prev.map(s => s.code);
+                    const newBlocks = blocks.filter(b => !existingCodes.includes(b));
+                    if (newBlocks.length === 0) return prev;
+                    
+                    const newSnippets = newBlocks.map(b => ({
+                      id: Math.random().toString(36).substr(2, 9),
+                      code: b,
+                      timestamp: new Date()
+                    }));
+                    return [...prev, ...newSnippets];
+                  });
+                }
               }
+              
               if (message.serverContent?.turnComplete) {
-                setTranscription(''); // Reset for next turn if desired
+                accumulatedTranscriptionRef.current = '';
+                setTranscription('');
               }
 
-              // Audio output handling
               const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
               if (base64Audio && audioContextOutRef.current) {
                 const ctx = audioContextOutRef.current;
@@ -146,7 +191,7 @@ const VoiceTutor: React.FC<VoiceTutorProps> = ({ active, context }) => {
           config: {
             responseModalities: [Modality.AUDIO],
             outputAudioTranscription: {},
-            systemInstruction: `أنت مساعد تعليمي ودود لطلاب الصف التاسع. ساعدهم في تعلم بايثون بالعربية. السياق الحالي: ${context}. كن مشجعاً وواضحاً.`,
+            systemInstruction: `أنت مساعد تعليمي ودود لطلاب الصف التاسع. ساعدهم في تعلم بايثون بالعربية. السياق الحالي: ${context}. كن مشجعاً وواضحاً. هام جداً: عندما تشرح كوداً برمجياً، قم بكتابته بوضوح داخل علامات الثلاث نقاط (markdown code blocks) مثل \`\`\`python ... \`\`\` لكي يتمكن الطالب من رؤيته ونسخه.`,
             speechConfig: {
               voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
             }
@@ -163,7 +208,6 @@ const VoiceTutor: React.FC<VoiceTutorProps> = ({ active, context }) => {
     startSession();
 
     return () => {
-      // Cleanup
       if (audioContextInRef.current) audioContextInRef.current.close();
       if (audioContextOutRef.current) audioContextOutRef.current.close();
       sourcesRef.current.forEach(s => s.stop());
@@ -171,37 +215,80 @@ const VoiceTutor: React.FC<VoiceTutorProps> = ({ active, context }) => {
   }, [active, context]);
 
   return (
-    <div className="bg-gray-900/50 rounded-xl p-6 border border-blue-500/30 h-full flex flex-col items-center justify-center space-y-4">
-      <div className="relative">
-        <div className={`w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center z-10 relative ${isReady ? 'animate-pulse' : 'opacity-50'}`}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-          </svg>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="bg-gray-900/50 rounded-xl p-4 border border-blue-500/30 flex flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <div className={`w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center z-10 relative ${isReady ? 'animate-pulse' : 'opacity-50'}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </div>
+          {isReady && (
+            <div className="absolute top-0 left-0 w-16 h-16 bg-blue-500 rounded-full animate-ping opacity-20"></div>
+          )}
         </div>
-        {isReady && (
-          <>
-            <div className="absolute top-0 left-0 w-20 h-20 bg-blue-500 rounded-full animate-ping opacity-25"></div>
-            <div className="absolute top-0 left-0 w-20 h-20 bg-blue-400 rounded-full animate-ping opacity-10 delay-150"></div>
-          </>
+        
+        <div className="text-center">
+          <h3 className="text-blue-300 font-bold text-sm">
+            {isReady ? 'المعلم يسمعك...' : 'جاري الاتصال...'}
+          </h3>
+        </div>
+
+        {transcription && (
+          <div className="w-full bg-gray-800/80 p-3 rounded-lg border border-gray-700 max-h-24 overflow-y-auto transition-all">
+            <p className="text-xs text-gray-300 leading-relaxed italic">
+              "{transcription}"
+            </p>
+          </div>
         )}
       </div>
-      
-      <div className="text-center">
-        <h3 className="text-blue-300 font-bold mb-1">
-          {isReady ? 'المعلم يسمعك الآن...' : 'جاري الاتصال بالمعلم...'}
-        </h3>
-        <p className="text-sm text-gray-400">
-          تحدث بالعربية واسأل عن أي شيء في الدرس
-        </p>
-      </div>
 
-      {transcription && (
-        <div className="w-full bg-gray-800/80 p-4 rounded-lg border border-gray-700 mt-4 max-h-32 overflow-y-auto">
-          <p className="text-sm text-gray-200 leading-relaxed italic">
-            "{transcription}"
-          </p>
-        </div>
-      )}
+      {/* Code Snippets Section */}
+      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+        <h4 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+          الأكواد المقترحة
+        </h4>
+        
+        {snippets.length === 0 ? (
+          <div className="text-center py-6 border-2 border-dashed border-gray-800 rounded-xl">
+            <p className="text-xs text-gray-600">سيظهر أي كود يذكره المعلم هنا تلقائياً</p>
+          </div>
+        ) : (
+          snippets.map((snippet) => (
+            <div key={snippet.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden group shadow-lg">
+              <div className="bg-gray-900 px-3 py-1.5 flex justify-between items-center border-b border-gray-700">
+                <span className="text-[10px] text-blue-400 font-mono">python_snippet.py</span>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => copyToClipboard(snippet.code)}
+                    className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                    title="نسخ الكود"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                  </button>
+                  <button 
+                    onClick={() => deleteSnippet(snippet.id)}
+                    className="p-1 hover:bg-red-900/30 rounded text-gray-400 hover:text-red-400 transition-colors"
+                    title="حذف"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <pre className="p-3 text-xs font-mono text-green-400 bg-gray-900/80 overflow-x-auto select-all" dir="ltr">
+                {snippet.code}
+              </pre>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
